@@ -41,7 +41,8 @@ void main(List<String> args) {
 
     check(_toHex(cobsEncode(decoded)) == cobsHex, 'cobs encode $decodedHex');
     check(_toHex(cobsrEncode(decoded)) == cobsrHex, 'cobsr encode $decodedHex');
-    check(_toHex(cobsDecode(_hex(cobsHex))) == decodedHex, 'cobs decode $cobsHex');
+    check(_toHex(cobsDecode(_hex(cobsHex))) == decodedHex,
+        'cobs decode $cobsHex');
     check(_toHex(cobsrDecode(_hex(cobsrHex))) == decodedHex,
         'cobsr decode $cobsrHex');
     checked++;
