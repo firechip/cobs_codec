@@ -25,6 +25,13 @@ schemes such as PPP byte stuffing, COBS never doubles a packet's size.
 - 🔌 **Stream framing built in** — turn a raw serial byte stream into a stream of
   decoded packets with `CobsFrameDecoder`; chunk boundaries don't have to align
   with frames.
+- 🚩 **Configurable delimiter (sentinel)** — encode and decode COBS *and* COBS/R
+  so the output avoids any chosen byte, not just `0x00`, letting that byte delimit
+  frames instead.
+- 🏷️ **Sentinel-aware framing** — the framing helpers and the stream decoder can
+  split on the chosen `sentinel` rather than `0x00`.
+- ♻️ **In-place decode** — decode basic COBS inside the same buffer with no second
+  allocation; COBS never expands on decode.
 - 🎯 **Zero dependencies, all platforms** — pure Dart (`dart:typed_data`), works
   on mobile, desktop, web, server and CLI. Uses `Uint8List` throughout.
 - 📏 **Predictable sizing** — `maxEncodedLength` / `encodingOverhead` for buffer
@@ -109,6 +116,56 @@ outgoingPackets
     .listen(serialPort.add);
 ```
 
+### A custom delimiter byte (sentinel)
+
+Need a delimiter other than `0x00` — say a byte your protocol reserves for
+framing? The `…WithSentinel` variants make the encoding avoid an arbitrary
+`sentinel` byte instead (they XOR the finished encoding with it), so that byte can
+delimit frames:
+
+```dart
+final data = [0x11, 0x22, 0x00, 0x33];
+
+final encoded = cobsEncodeWithSentinel(data, 0xAA); // [0xA9, 0xBB, 0x88, 0xA8, 0x99] — no 0xAA
+final decoded = cobsDecodeWithSentinel(encoded, 0xAA); // [0x11, 0x22, 0x00, 0x33]
+
+// COBS/R has the same pair.
+cobsrEncodeWithSentinel(data, 0xAA); // [0xA9, 0xBB, 0x88, 0x99]
+```
+
+`sentinel == 0` is byte-for-byte identical to the plain codec, and decoding never
+mutates its input.
+
+### Decoding in place
+
+Basic COBS never expands on decode, so it can be decoded within the same buffer —
+no second allocation. `cobsDecodeInPlace` overwrites the buffer with the decoded
+bytes and returns their length:
+
+```dart
+final buffer = Uint8List.fromList(cobs.encode([0x11, 0x22, 0x00, 0x33]));
+// buffer == [0x03, 0x11, 0x22, 0x02, 0x33]
+
+final n = cobsDecodeInPlace(buffer);                 // 4
+final decoded = Uint8List.sublistView(buffer, 0, n); // [0x11, 0x22, 0x00, 0x33]
+```
+
+`cobsDecodeInPlaceWithSentinel(buffer, sentinel)` does the same for a custom
+delimiter. (COBS/R can expand on decode, so it has no in-place form.)
+
+### Framing on a custom sentinel
+
+`cobsFrame` / `cobsUnframe` and both stream transformers take the same optional
+`sentinel`, so a whole link can be delimited by a byte other than `0x00`:
+
+```dart
+final frame = cobsFrame([0x11, 0x00, 0x22], sentinel: 0xAA); // [0xA8, 0xBB, 0xA8, 0x88, 0xAA]
+final packets = cobsUnframe(frame, sentinel: 0xAA);          // [[0x11, 0x00, 0x22]]
+
+// The stream decoder frames on the same byte:
+serialPort.transform(const CobsFrameDecoder(sentinel: 0xAA));
+```
+
 ### Composing with other codecs
 
 Because they are `Codec`s, you can `fuse` COBS with anything:
@@ -148,10 +205,13 @@ same. Compare PPP/SLIP escape stuffing, whose worst case **doubles** the packet.
 | `cobs` / `cobsr` | Shared `Codec` instances (basic COBS and COBS/R). |
 | `cobsEncode` / `cobsDecode` | Direct basic-COBS functions. |
 | `cobsrEncode` / `cobsrDecode` | Direct COBS/R functions. |
+| `cobsEncodeWithSentinel` / `cobsDecodeWithSentinel` | Basic COBS against an arbitrary delimiter byte. |
+| `cobsrEncodeWithSentinel` / `cobsrDecodeWithSentinel` | COBS/R against an arbitrary delimiter byte. |
+| `cobsDecodeInPlace` / `cobsDecodeInPlaceWithSentinel` | Decode basic COBS within the buffer; returns the length. |
 | `CobsCodec`, `CobsEncoder`, `CobsDecoder` | `dart:convert` classes for basic COBS. |
 | `CobsrCodec`, `CobsrEncoder`, `CobsrDecoder` | `dart:convert` classes for COBS/R. |
-| `cobsFrame` / `cobsUnframe` | Add / split the `0x00` frame delimiter. |
-| `CobsFrameEncoder` / `CobsFrameDecoder` | Stream transformers for framed links. |
+| `cobsFrame` / `cobsUnframe` | Add / split the frame delimiter (`0x00` or a custom `sentinel`). |
+| `CobsFrameEncoder` / `CobsFrameDecoder` | Stream transformers for framed links (optional `sentinel`). |
 | `cobsDelimiter` | The frame delimiter byte (`0x00`). |
 | `encodingOverhead` / `maxEncodedLength` | Size bounds. |
 | `cobsMaxBlockLength` | Max data bytes per COBS block (`254`). |
