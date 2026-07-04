@@ -1,5 +1,6 @@
 # cobs_codec
 
+[![CI](https://github.com/firechip/cobs_codec/actions/workflows/ci.yml/badge.svg)](https://github.com/firechip/cobs_codec/actions/workflows/ci.yml)
 [![pub package](https://img.shields.io/pub/v/cobs_codec.svg)](https://pub.dev/packages/cobs_codec)
 [![pub points](https://img.shields.io/pub/points/cobs_codec)](https://pub.dev/packages/cobs_codec/score)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
