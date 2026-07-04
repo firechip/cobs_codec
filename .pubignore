@@ -1,2 +1,5 @@
 # Dev-only conformance tooling; not part of the published package.
 tool/
+
+# Dev-only throughput benchmarks; not part of the published package.
+benchmark/

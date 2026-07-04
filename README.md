@@ -222,6 +222,18 @@ same. Compare PPP/SLIP escape stuffing, whose worst case **doubles** the packet.
 > `cobsUnframe` or `CobsFrameDecoder`). This matches the reference COBS
 > implementations, where framing is the application's responsibility.
 
+## Benchmarks
+
+Single-threaded throughput on a 1 KiB payload
+(`dart run benchmark/cobs_benchmark.dart`), Dart 3.x on an AMD Ryzen 7 3800XT
+under WSL2 — indicative, not a controlled benchmark:
+
+| Operation | Throughput |
+| --------- | ---------- |
+| `cobsEncode` | ~580 MB/s |
+| `cobsDecode` | ~570 MB/s |
+| `cobsrEncode` | ~610 MB/s |
+
 ## Background
 
 COBS is described in:
