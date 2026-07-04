@@ -58,3 +58,16 @@ jobs:
         run: |
           dart pub global activate pana
           dart pub global run pana --no-warning --exit-code-threshold 20 .
+
+  conformance:
+    name: Conformance vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1
+      - name: Install dependencies
+        run: dart pub get
+      - name: Download shared conformance vectors
+        run: curl -sSfL -o vectors.jsonl https://raw.githubusercontent.com/firechip/cobs-conformance/v1.0.0/vectors/vectors.jsonl
+      - name: Check conformance
+        run: dart run tool/conformance.dart vectors.jsonl
