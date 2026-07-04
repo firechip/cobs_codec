@@ -3,6 +3,23 @@
 All notable changes to this package are documented here. This project adheres
 to [Semantic Versioning](https://semver.org).
 
+## 1.2.0
+
+### Added
+
+- **In-place COBS/R decoding**: `cobsrDecodeInPlace` and
+  `cobsrDecodeInPlaceWithSentinel` decode the reduced codec within the caller's
+  `Uint8List` and return the decoded length, needing no output buffer (COBS/R
+  decoding never expands the data).
+
+### Changed
+
+- Added a dependency-free throughput benchmark
+  (`benchmark/cobs_benchmark.dart`, excluded from the published package) that
+  runs on every supported SDK.
+- Extended the conformance test to also cover the configurable-sentinel and
+  decode-error vectors from firechip/cobs-conformance.
+
 ## 1.1.0
 
 ### Added
