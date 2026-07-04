@@ -166,6 +166,81 @@ Uint8List cobsrDecodeWithSentinel(List<int> input, int sentinel) {
   return cobsrDecode(copy);
 }
 
+/// Decodes COBS/R data in place, overwriting [buffer] with the decoded bytes and
+/// returning their length; the decoded output occupies `buffer[0..n]`.
+///
+/// This needs no separate output buffer: the COBS/R decoded length never exceeds
+/// the encoded length, so the write position always trails the read position.
+/// The reduced final block appends its length-code byte onto a position that has
+/// already been read, so unread input is never clobbered. The bytes of [buffer]
+/// beyond the returned length are left in an unspecified (partially overwritten)
+/// state.
+///
+/// As with [cobsrDecode], a length code that points past the end of [buffer] is
+/// not an error: it signals the reduced final block, and the length code itself
+/// is appended as the final data byte.
+///
+/// Throws a [CobsDecodeException] if [buffer] contains a `0x00` byte.
+int cobsrDecodeInPlace(Uint8List buffer) {
+  final srcLen = buffer.length;
+  if (srcLen == 0) return 0;
+
+  var writeIndex = 0;
+  var index = 0;
+
+  while (true) {
+    final code = buffer[index];
+    if (code == 0) {
+      throw CobsDecodeException('zero byte in COBS/R input', buffer, index);
+    }
+    index++;
+    final blockEnd = index + code - 1;
+    final copyEnd = blockEnd < srcLen ? blockEnd : srcLen;
+    for (; index < copyEnd; index++) {
+      final byte = buffer[index];
+      if (byte == 0) {
+        throw CobsDecodeException('zero byte in COBS/R input', buffer, index);
+      }
+      // `writeIndex` trails `index` throughout, so this never clobbers a byte
+      // that has not yet been read.
+      buffer[writeIndex++] = byte;
+    }
+    if (blockEnd > srcLen) {
+      // Reduced encoding: the length code was really the final data byte. The
+      // append lands on an already-read byte (`writeIndex < index == srcLen`),
+      // so it is safe to perform in place.
+      buffer[writeIndex++] = code;
+      break;
+    } else if (blockEnd < srcLen) {
+      if (code < 0xFF) buffer[writeIndex++] = 0;
+    } else {
+      break;
+    }
+  }
+
+  return writeIndex;
+}
+
+/// Decodes COBS/R data that was encoded with an arbitrary [sentinel] byte in
+/// place, overwriting [buffer] with the decoded bytes and returning their
+/// length; the decoded output occupies `buffer[0..n]`.
+///
+/// When [sentinel] is non-zero, [buffer] is first XORed with it (masked to the
+/// low 8 bits) and then decoded in place by [cobsrDecodeInPlace].
+/// `sentinel == 0` is identical to [cobsrDecodeInPlace]. As an in-place
+/// operation this necessarily consumes (overwrites) [buffer].
+///
+/// Throws a [CobsDecodeException] if [buffer] is not valid.
+int cobsrDecodeInPlaceWithSentinel(Uint8List buffer, int sentinel) {
+  final s = sentinel & 0xFF;
+  if (s != 0) {
+    for (var i = 0; i < buffer.length; i++) {
+      buffer[i] ^= s;
+    }
+  }
+  return cobsrDecodeInPlace(buffer);
+}
+
 /// A [Codec] that encodes and decodes bytes with Consistent Overhead Byte
 /// Stuffing — Reduced (COBS/R).
 ///

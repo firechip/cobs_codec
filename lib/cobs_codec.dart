@@ -58,6 +58,8 @@ export 'src/cobsr.dart'
         CobsrEncoder,
         cobsr,
         cobsrDecode,
+        cobsrDecodeInPlace,
+        cobsrDecodeInPlaceWithSentinel,
         cobsrDecodeWithSentinel,
         cobsrEncode,
         cobsrEncodeWithSentinel;
