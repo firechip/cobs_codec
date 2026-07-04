@@ -62,15 +62,49 @@ non-negotiable:
 - Keep the public surface minimal; add internal code under `lib/src/` and export
   deliberately from `lib/cobs_codec.dart`.
 
-## Commits and pull requests
+## Git workflow: Trunk-Based Development with tbdflow
 
-- Write clear, imperative commit messages (e.g. "Fix decoder backpressure on
-  delimiter-less runs").
-- Commits and tags in this repository are **SSH-signed**; please sign your
-  commits (`git config gpg.format ssh` and set `user.signingkey`) and include a
-  sign-off (`git commit -s`) certifying the [DCO](https://developercertificate.org/).
-- Keep pull requests focused; update `CHANGELOG.md` under an `## Unreleased`
-  heading for user-visible changes.
+This project uses [Trunk-Based Development](https://trunkbaseddevelopment.com/):
+small, frequent changes integrated into `main` (the trunk) rather than
+long-lived branches. We use the [`tbdflow`](https://github.com/cladam/tbdflow)
+CLI (`cargo install tbdflow`) so the safe path is the easy path.
+
+`tbdflow commit` pulls `main`, creates a Conventional Commit, and pushes:
+
+```console
+tbdflow commit --type fix --scope decoder -m "handle backpressure on idle links"
+```
+
+For a change that needs review, use a short-lived branch and merge it back
+quickly: `tbdflow branch --type feat --name my-change`, then `tbdflow complete`.
+Other helpers: `tbdflow sync`, `tbdflow radar`, `tbdflow changelog`,
+`tbdflow undo`.
+
+Two committed files drive this workflow:
+
+- **`.tbdflow.yml`** -- workflow + commit-message lint rules (trunk branch,
+  allowed Conventional Commit types, lowercase scope/subject, 72-char subject).
+- **`.dod.yml`** -- the Definition of Done checklist shown before each commit
+  (format, analyze, test, changelog, conformance). Bypass for a trivial change
+  with `--no-verify`.
+
+Commits and tags are **SSH-signed** (`tbdflow commit` respects the repo's
+signing config); include a sign-off (`-s`) certifying the
+[DCO](https://developercertificate.org/). Keep pull requests focused and update
+`CHANGELOG.md` under an `## Unreleased` heading for user-visible changes.
+
+## Conventional Commits
+
+Every commit message follows
+[Conventional Commits](https://www.conventionalcommits.org):
+`type(scope): short imperative subject`. Allowed **types**: `build`, `chore`,
+`ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. The
+subject is lowercase, imperative, and has no trailing period; breaking changes
+use `!` (`feat!:`) or a `BREAKING CHANGE:` footer.
+
+This is enforced locally by `tbdflow commit` and in CI by the **Commit lint**
+workflow (`.github/workflows/commit-lint.yml`), which checks every commit in a
+pull request.
 
 ## Reporting bugs
 

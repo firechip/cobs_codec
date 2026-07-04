@@ -1,0 +1,8 @@
+# Definition of Done, shown by `tbdflow commit` before each commit.
+checklist:
+  - "`dart format .` produces no changes."
+  - "`dart analyze` reports no issues."
+  - "`dart test` passes."
+  - "New behaviour is covered by tests (golden vectors for codec changes)."
+  - "CHANGELOG.md is updated for user-visible changes."
+  - "The package still conforms to the firechip/cobs-conformance vectors."
