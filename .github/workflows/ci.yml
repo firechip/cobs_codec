@@ -68,6 +68,10 @@ jobs:
       - name: Install dependencies
         run: dart pub get
       - name: Download shared conformance vectors
-        run: curl -sSfL -o vectors.jsonl https://raw.githubusercontent.com/firechip/cobs-conformance/v1.0.0/vectors/vectors.jsonl
+        run: |
+          base=https://raw.githubusercontent.com/firechip/cobs-conformance/v1.1.0/vectors
+          curl -sSfL -o vectors.jsonl "$base/vectors.jsonl"
+          curl -sSfL -o sentinel.jsonl "$base/sentinel.jsonl"
+          curl -sSfL -o errors.jsonl "$base/errors.jsonl"
       - name: Check conformance
-        run: dart run tool/conformance.dart vectors.jsonl
+        run: dart run tool/conformance.dart vectors.jsonl sentinel.jsonl errors.jsonl
