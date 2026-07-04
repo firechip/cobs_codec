@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    name: Analyze & test (Dart ${{ matrix.sdk }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # `stable` is the enforcement leg; the pinned version guards the
+        # declared minimum SDK (pubspec `environment: sdk`).
+        sdk: [stable, "3.5.0"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+      - name: Install dependencies
+        run: dart pub get
+      - name: Verify formatting
+        if: matrix.sdk == 'stable'
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze (strict)
+        if: matrix.sdk == 'stable'
+        run: dart analyze --fatal-infos
+      - name: Analyze (compatibility)
+        if: matrix.sdk != 'stable'
+        run: dart analyze
+      - name: Run tests
+        run: dart test
+      - name: Run example
+        run: dart run example/cobs_codec_example.dart
+
+  score:
+    name: pub.dev score (pana)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - name: Install dependencies
+        run: dart pub get
+      - name: Run pana
+        # Fail if more than 20 of the 160 points are lost.
+        run: |
+          dart pub global activate pana
+          dart pub global run pana --no-warning --exit-code-threshold 20 .

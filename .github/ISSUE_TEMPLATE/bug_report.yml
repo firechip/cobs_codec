@@ -1,0 +1,68 @@
+name: Bug report
+description: Report incorrect encoding/decoding or another defect in cobs_codec.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for taking the time to file a bug! A minimal, byte-level
+        reproduction is by far the most helpful thing you can provide.
+  - type: input
+    id: version
+    attributes:
+      label: cobs_codec version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: sdk
+    attributes:
+      label: Dart / Flutter version
+      description: Output of `dart --version` (or `flutter --version`).
+      placeholder: "Dart SDK version: 3.12.2 (stable)"
+    validations:
+      required: true
+  - type: dropdown
+    id: api
+    attributes:
+      label: Which part of the API?
+      multiple: true
+      options:
+        - cobs (basic COBS)
+        - cobsr (COBS/R)
+        - framing / streaming (cobsFrame, CobsFrameEncoder/Decoder)
+        - size helpers (encodingOverhead / maxEncodedLength)
+        - other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: >
+        Describe the problem. Include the **input bytes in hex**, what you
+        expected, and what you actually got.
+      placeholder: |
+        Input:    0x11 0x00 0x22
+        Expected: 0x02 0x11 0x02 0x22
+        Actual:   ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A short Dart snippet that reproduces the issue.
+      render: dart
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I reproduced this with the latest version of cobs_codec.
+          required: false

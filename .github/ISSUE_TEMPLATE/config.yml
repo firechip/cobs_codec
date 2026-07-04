@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Package page & documentation
+    url: https://pub.dev/packages/cobs_codec
+    about: API docs, usage examples, and versions on pub.dev.
