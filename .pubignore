@@ -1,0 +1,3 @@
+# Keep the published Dart package lean: the Kotlin/Android library is a
+# sibling project in this monorepo and is not part of the Dart package.
+cobs_codec_kt/
