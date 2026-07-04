@@ -129,6 +129,43 @@ Uint8List cobsrDecode(List<int> input) {
   return Uint8List.sublistView(out, 0, writeIndex);
 }
 
+/// Encodes [input] with COBS/R using an arbitrary [sentinel] byte instead of
+/// `0x00`, returning a [Uint8List] that never contains the [sentinel].
+///
+/// This runs the ordinary [cobsrEncode] and then XORs every output byte with
+/// [sentinel] (masked to the low 8 bits), which shifts the byte the encoding
+/// avoids from `0x00` to [sentinel]. `sentinel == 0` is byte-for-byte identical
+/// to [cobsrEncode].
+Uint8List cobsrEncodeWithSentinel(List<int> input, int sentinel) {
+  final encoded = cobsrEncode(input);
+  final s = sentinel & 0xFF;
+  if (s != 0) {
+    for (var i = 0; i < encoded.length; i++) {
+      encoded[i] ^= s;
+    }
+  }
+  return encoded;
+}
+
+/// Decodes COBS/R [input] that was encoded with an arbitrary [sentinel] byte
+/// (see [cobsrEncodeWithSentinel]), returning the original bytes.
+///
+/// A fresh copy of [input] is XORed back with [sentinel] (masked to the low 8
+/// bits) before decoding, so the caller's [input] is never mutated.
+/// `sentinel == 0` is identical to [cobsrDecode].
+///
+/// Throws a [CobsDecodeException] if the recovered bytes contain a `0x00` byte
+/// (for example, if [input] itself contained the [sentinel]).
+Uint8List cobsrDecodeWithSentinel(List<int> input, int sentinel) {
+  final s = sentinel & 0xFF;
+  if (s == 0) return cobsrDecode(input);
+  final copy = Uint8List(input.length);
+  for (var i = 0; i < copy.length; i++) {
+    copy[i] = input[i] ^ s;
+  }
+  return cobsrDecode(copy);
+}
+
 /// A [Codec] that encodes and decodes bytes with Consistent Overhead Byte
 /// Stuffing — Reduced (COBS/R).
 ///

@@ -130,6 +130,114 @@ Uint8List cobsDecode(List<int> input) {
   return Uint8List.sublistView(out, 0, writeIndex);
 }
 
+/// Encodes [input] with basic COBS using an arbitrary [sentinel] byte instead of
+/// `0x00`, returning a [Uint8List] that never contains the [sentinel].
+///
+/// This runs the ordinary [cobsEncode] and then XORs every output byte with
+/// [sentinel] (masked to the low 8 bits), which shifts the byte the encoding
+/// avoids from `0x00` to [sentinel]. Choosing a [sentinel] that rarely occurs in
+/// the payload minimises overhead. `sentinel == 0` is byte-for-byte identical to
+/// [cobsEncode].
+Uint8List cobsEncodeWithSentinel(List<int> input, int sentinel) {
+  final encoded = cobsEncode(input);
+  final s = sentinel & 0xFF;
+  if (s != 0) {
+    for (var i = 0; i < encoded.length; i++) {
+      encoded[i] ^= s;
+    }
+  }
+  return encoded;
+}
+
+/// Decodes basic-COBS [input] that was encoded with an arbitrary [sentinel] byte
+/// (see [cobsEncodeWithSentinel]), returning the original bytes.
+///
+/// A fresh copy of [input] is XORed back with [sentinel] (masked to the low 8
+/// bits) before decoding, so the caller's [input] is never mutated.
+/// `sentinel == 0` is identical to [cobsDecode].
+///
+/// Throws a [CobsDecodeException] if the recovered bytes are not valid COBS (for
+/// example, if [input] itself contained the [sentinel]).
+Uint8List cobsDecodeWithSentinel(List<int> input, int sentinel) {
+  final s = sentinel & 0xFF;
+  if (s == 0) return cobsDecode(input);
+  final copy = Uint8List(input.length);
+  for (var i = 0; i < copy.length; i++) {
+    copy[i] = input[i] ^ s;
+  }
+  return cobsDecode(copy);
+}
+
+/// Decodes basic-COBS data in place, overwriting [buffer] with the decoded bytes
+/// and returning their length; the decoded output occupies `buffer[0..n]`.
+///
+/// This needs no separate output buffer: COBS decoding never expands, so the
+/// write position always trails the read position — there is therefore no
+/// "output too small" case. The bytes of [buffer] beyond the returned length are
+/// left in an unspecified (partially overwritten) state.
+///
+/// Throws a [CobsDecodeException] if [buffer] is not valid COBS.
+int cobsDecodeInPlace(Uint8List buffer) {
+  final srcLen = buffer.length;
+  if (srcLen == 0) return 0;
+
+  var writeIndex = 0;
+  var index = 0;
+
+  while (true) {
+    final code = buffer[index];
+    if (code == 0) {
+      throw CobsDecodeException('zero byte in COBS input', buffer, index);
+    }
+    index++;
+    final blockEnd = index + code - 1;
+    final copyEnd = blockEnd < srcLen ? blockEnd : srcLen;
+    for (; index < copyEnd; index++) {
+      final byte = buffer[index];
+      if (byte == 0) {
+        throw CobsDecodeException('zero byte in COBS input', buffer, index);
+      }
+      // `writeIndex` trails `index` throughout, so this never clobbers a byte
+      // that has not yet been read.
+      buffer[writeIndex++] = byte;
+    }
+    if (blockEnd > srcLen) {
+      throw CobsDecodeException(
+        'length code points past end of input',
+        buffer,
+        blockEnd - code, // index of the offending length code
+      );
+    }
+    if (blockEnd < srcLen) {
+      if (code < 0xFF) buffer[writeIndex++] = 0;
+    } else {
+      break;
+    }
+  }
+
+  return writeIndex;
+}
+
+/// Decodes basic-COBS data that was encoded with an arbitrary [sentinel] byte in
+/// place, overwriting [buffer] with the decoded bytes and returning their
+/// length; the decoded output occupies `buffer[0..n]`.
+///
+/// When [sentinel] is non-zero, [buffer] is first XORed with it (masked to the
+/// low 8 bits) and then decoded in place by [cobsDecodeInPlace]. `sentinel == 0`
+/// is identical to [cobsDecodeInPlace]. As an in-place operation this
+/// necessarily consumes (overwrites) [buffer].
+///
+/// Throws a [CobsDecodeException] if [buffer] is not valid.
+int cobsDecodeInPlaceWithSentinel(Uint8List buffer, int sentinel) {
+  final s = sentinel & 0xFF;
+  if (s != 0) {
+    for (var i = 0; i < buffer.length; i++) {
+      buffer[i] ^= s;
+    }
+  }
+  return cobsDecodeInPlace(buffer);
+}
+
 /// A [Codec] that encodes and decodes bytes with basic Consistent Overhead Byte
 /// Stuffing (COBS).
 ///

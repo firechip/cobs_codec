@@ -23,8 +23,29 @@ const int cobsDelimiter = 0x00;
 Uint8List _asBytes(List<int> bytes) =>
     bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
-/// Encodes [packet] with [codec] (basic [cobs] by default) and appends the
-/// [cobsDelimiter], producing a self-delimiting frame ready to transmit.
+/// Returns the frame `bytes[start..end)` XORed by [sentinel], ready to hand to a
+/// codec's plain decoder.
+///
+/// For a non-zero [sentinel] a fresh copy is made so the caller's [bytes] are
+/// never mutated; for `0` the slice is viewed without copying, preserving the
+/// zero-copy behaviour of the plain delimiter path.
+Uint8List _deSentinel(Uint8List bytes, int start, int end, int sentinel) {
+  if (sentinel == 0) return Uint8List.sublistView(bytes, start, end);
+  final frame = Uint8List(end - start);
+  for (var i = 0; i < frame.length; i++) {
+    frame[i] = bytes[start + i] ^ sentinel;
+  }
+  return frame;
+}
+
+/// Encodes [packet] with [codec] (basic [cobs] by default) and appends the frame
+/// delimiter, producing a self-delimiting frame ready to transmit.
+///
+/// By default frames are delimited by the [cobsDelimiter] (`0x00`). Pass a
+/// non-zero [sentinel] to delimit on that byte instead: the encoding is made to
+/// avoid [sentinel] (by XORing the codec's output with it) and [sentinel] is
+/// appended as the delimiter. Decode such a frame with a matching [sentinel] in
+/// [cobsUnframe] or [CobsFrameDecoder].
 ///
 /// ```dart
 /// final frame = cobsFrame([0x11, 0x00, 0x22]);
@@ -33,16 +54,28 @@ Uint8List _asBytes(List<int> bytes) =>
 Uint8List cobsFrame(
   List<int> packet, {
   Codec<List<int>, List<int>> codec = cobs,
+  int sentinel = cobsDelimiter,
 }) {
   final encoded = codec.encode(packet);
   final out = Uint8List(encoded.length + 1);
   out.setRange(0, encoded.length, encoded);
-  // out[encoded.length] is already 0x00 (the delimiter).
+  final s = sentinel & 0xFF;
+  if (s != 0) {
+    for (var i = 0; i < encoded.length; i++) {
+      out[i] ^= s;
+    }
+  }
+  out[encoded.length] = s; // the delimiter (already 0 when s == 0)
   return out;
 }
 
-/// Splits [data] on the [cobsDelimiter] and decodes each frame with [codec],
+/// Splits [data] on the frame delimiter and decodes each frame with [codec],
 /// returning the list of recovered packets.
+///
+/// By default frames are delimited by the [cobsDelimiter] (`0x00`). Pass the
+/// non-zero [sentinel] used to frame the data to split on that byte instead and
+/// undo its XOR before decoding; the frame slice is copied before it is XORed, so
+/// [data] is never mutated.
 ///
 /// Any trailing bytes after the final delimiter are treated as an incomplete
 /// frame and ignored. When [skipEmpty] is true (the default), empty frames
@@ -55,17 +88,18 @@ List<Uint8List> cobsUnframe(
   List<int> data, {
   Codec<List<int>, List<int>> codec = cobs,
   bool skipEmpty = true,
+  int sentinel = cobsDelimiter,
 }) {
   final frames = <Uint8List>[];
   final bytes = _asBytes(data);
+  final s = sentinel & 0xFF;
   var start = 0;
   for (var i = 0; i < bytes.length; i++) {
-    if (bytes[i] == cobsDelimiter) {
+    if (bytes[i] == s) {
       if (i == start) {
         if (!skipEmpty) frames.add(Uint8List(0));
       } else {
-        frames.add(
-            _asBytes(codec.decode(Uint8List.sublistView(bytes, start, i))));
+        frames.add(_asBytes(codec.decode(_deSentinel(bytes, start, i, s))));
       }
       start = i + 1;
     }
@@ -80,16 +114,21 @@ List<Uint8List> cobsUnframe(
 /// outgoingPackets.transform(const CobsFrameEncoder()).pipe(serialSink);
 /// ```
 class CobsFrameEncoder extends StreamTransformerBase<List<int>, Uint8List> {
-  /// Creates a frame encoder using [codec] (basic [cobs] by default).
-  const CobsFrameEncoder({this.codec = cobs});
+  /// Creates a frame encoder using [codec] (basic [cobs] by default), delimiting
+  /// each frame with [sentinel] (the `0x00` [cobsDelimiter] by default).
+  const CobsFrameEncoder({this.codec = cobs, this.sentinel = cobsDelimiter});
 
   /// The codec used to encode each packet.
   final Codec<List<int>, List<int>> codec;
 
+  /// The byte value used to delimit frames on the wire (and that the encoding is
+  /// made to avoid). Defaults to the `0x00` [cobsDelimiter].
+  final int sentinel;
+
   @override
   Stream<Uint8List> bind(Stream<List<int>> stream) async* {
     await for (final packet in stream) {
-      yield cobsFrame(packet, codec: codec);
+      yield cobsFrame(packet, codec: codec, sentinel: sentinel);
     }
   }
 }
@@ -125,10 +164,16 @@ class CobsFrameDecoder extends StreamTransformerBase<List<int>, Uint8List> {
     this.skipEmpty = true,
     this.maxFrameLength,
     this.onInvalidFrame,
+    this.sentinel = cobsDelimiter,
   });
 
   /// The codec used to decode each frame.
   final Codec<List<int>, List<int>> codec;
+
+  /// The byte value that delimits frames on the wire (and that the encoding is
+  /// made to avoid). The stream is split on this byte and each frame is XORed
+  /// back with it before decoding. Defaults to the `0x00` [cobsDelimiter].
+  final int sentinel;
 
   /// Whether to skip empty frames (from consecutive or leading delimiters)
   /// rather than emit empty packets.
@@ -160,6 +205,7 @@ class CobsFrameDecoder extends StreamTransformerBase<List<int>, Uint8List> {
     // completes a frame — so a delimiter-less run would otherwise ignore
     // backpressure and make the subscription impossible to cancel.
     final buffer = BytesBuilder(copy: false);
+    final delimiter = sentinel & 0xFF;
     late final StreamController<Uint8List> controller;
     StreamSubscription<List<int>>? subscription;
 
@@ -177,7 +223,7 @@ class CobsFrameDecoder extends StreamTransformerBase<List<int>, Uint8List> {
       final bytes = _asBytes(chunk);
       var start = 0;
       for (var i = 0; i < bytes.length; i++) {
-        if (bytes[i] != cobsDelimiter) continue;
+        if (bytes[i] != delimiter) continue;
         // The delimiter completes a frame: buffered bytes + this chunk up to
         // (but not including) the delimiter. This sublist view is consumed
         // synchronously by takeBytes/decode below, so it need not be copied.
@@ -187,6 +233,14 @@ class CobsFrameDecoder extends StreamTransformerBase<List<int>, Uint8List> {
         if (frame.isEmpty) {
           if (!skipEmpty) controller.add(Uint8List(0));
           continue;
+        }
+        // `frame` is owned by this decoder (from takeBytes), so undoing the
+        // sentinel XOR in place is safe; when the delimiter is 0x00 this is a
+        // no-op and the plain-COBS path is unchanged.
+        if (delimiter != 0) {
+          for (var j = 0; j < frame.length; j++) {
+            frame[j] ^= delimiter;
+          }
         }
         try {
           controller.add(_asBytes(codec.decode(frame)));

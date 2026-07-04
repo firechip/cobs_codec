@@ -2,7 +2,7 @@ name: cobs_codec
 description: >-
   Consistent Overhead Byte Stuffing (COBS) and COBS/R codecs for zero-free,
   low-overhead framing of serial, UART and packet byte streams.
-version: 1.0.0
+version: 1.1.0
 repository: https://github.com/firechip/cobs_codec
 issue_tracker: https://github.com/firechip/cobs_codec/issues
 homepage: https://firechip.dev

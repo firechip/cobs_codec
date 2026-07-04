@@ -40,7 +40,7 @@ dart pub add cobs_codec
 
 ```yaml
 dependencies:
-  cobs_codec: ^1.0.0
+  cobs_codec: ^1.1.0
 ```
 
 ## Usage

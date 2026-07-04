@@ -40,7 +40,17 @@
 library;
 
 export 'src/cobs.dart'
-    show CobsCodec, CobsDecoder, CobsEncoder, cobs, cobsDecode, cobsEncode;
+    show
+        CobsCodec,
+        CobsDecoder,
+        CobsEncoder,
+        cobs,
+        cobsDecode,
+        cobsDecodeInPlace,
+        cobsDecodeInPlaceWithSentinel,
+        cobsDecodeWithSentinel,
+        cobsEncode,
+        cobsEncodeWithSentinel;
 export 'src/cobsr.dart'
     show
         CobsrCodec,
@@ -48,7 +58,9 @@ export 'src/cobsr.dart'
         CobsrEncoder,
         cobsr,
         cobsrDecode,
-        cobsrEncode;
+        cobsrDecodeWithSentinel,
+        cobsrEncode,
+        cobsrEncodeWithSentinel;
 export 'src/exceptions.dart' show CobsDecodeException;
 export 'src/framing.dart'
     show
