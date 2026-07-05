@@ -111,6 +111,30 @@ pull request.
 Open an issue at <https://github.com/firechip/cobs_codec/issues> with a minimal
 reproduction: the input bytes, what you expected, and what you got.
 
+## Releasing
+
+Publishing to pub.dev is automated from a signed `v*` tag, but the **GitHub
+Release is created by hand — don't skip it.** The full checklist:
+
+1. Bump `version` in [`pubspec.yaml`](pubspec.yaml) and add a `## X.Y.Z` section
+   to [`CHANGELOG.md`](CHANGELOG.md). Validate with `dart pub publish --dry-run`.
+2. Commit (`chore: release X.Y.Z`) and tag it **signed**:
+   `git tag -s vX.Y.Z -m "cobs_codec X.Y.Z"`; push `main` and the tag.
+3. The tag triggers [`publish.yml`](.github/workflows/publish.yml), which
+   publishes to **pub.dev** via automated publishing (OIDC) — no credentials.
+4. Create the **GitHub Release** and attach the exact published archive:
+
+   ```console
+   curl -fsSL https://pub.dev/api/archives/cobs_codec-X.Y.Z.tar.gz \
+     -o cobs_codec-X.Y.Z.tar.gz
+   gh release create vX.Y.Z --verify-tag --title "cobs_codec X.Y.Z" \
+     --notes-file notes.md cobs_codec-X.Y.Z.tar.gz
+   ```
+
+   The description should mirror the pub.dev release: the `CHANGELOG.md`
+   highlights, an install snippet, and the
+   `pub.dev/packages/cobs_codec/versions/X.Y.Z` link.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the
